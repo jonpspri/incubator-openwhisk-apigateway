@@ -1,0 +1,12 @@
+subprojects {
+    task dockerFiles(type: Copy) {
+        from 'init.sh', 'etc-api-gateway'
+        from './Dockerfile.in' {
+          expand ('profileOn': hasProperty('profileOn'))
+        }
+        into dockerBuildImage.inputDir
+    }
+
+    dockerBuildImage.dependsOn dockerFiles
+}
+

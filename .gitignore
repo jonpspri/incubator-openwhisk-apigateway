@@ -18,3 +18,8 @@ secrets.yml
 
 # npm
 npm-debug.log
+
+# Some places where secrets are kept...
+docker-local.json
+*.pem
+/tls
