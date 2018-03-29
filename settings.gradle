@@ -10,6 +10,8 @@ gradle.ext.dockerBuildProjects =
     /* TODO: default imageName to project folder name in lowercase? */
     ':core:apigateway': [ 'dockerImageName': 'apigateway' ]
 ]
+
+include ':core:apigateway-profiling'
 /* -- END: Project-specific configuration -- */
 
 /*
