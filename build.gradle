@@ -26,7 +26,7 @@ buildscript {
     dependencies {
         classpath "cz.alenkacz:gradle-scalafmt:${gradle.scalafmt.version}"
         classpath 'org.ajoberstar:grgit:2.1.0'
-        classpath 'com.bmuschko:gradle-docker-plugin:3.2.2'
+        classpath 'com.bmuschko:gradle-docker-plugin:3.2.5'
         classpath 'com.xanophis:gradle-fatmanifest-plugin:0.0.5'
     }
 }

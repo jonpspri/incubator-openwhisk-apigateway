@@ -15,8 +15,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
         ca-certificates \
         wget \
         curl \
-        python python-pip \
-        musl-dev musl-tools \
+        python \
         libssl-dev \
         libpcre2-dev \
         zlib1g-dev \
@@ -113,7 +112,6 @@ RUN echo " ... installing cjose ... " \
     && rm -rf /tmp/api-gateway
 
 COPY init.sh /etc/init-container.sh
-RUN pip install dumb-init==1.2.1
 
 # add the default configuration for the Gateway
 
@@ -127,7 +125,7 @@ RUN adduser --system --disabled-password --gecos "" nginx-api-gateway
 
 EXPOSE 80 8080 8423 9000
 
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+ENTRYPOINT ["/dev/init", "--"]
 CMD ["/etc/init-container.sh"]
 
 # VIM: let b:syntastic_dockerfile_hadolint_args = "--ignore DL3008 --ignore SC2154 "

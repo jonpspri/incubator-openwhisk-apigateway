@@ -8,7 +8,6 @@ FROM alpine:3.7
 
 # install dependencies
 RUN apk --update --no-cache add \
-        bash \
         tar \
         libtool \
         jemalloc \
@@ -17,7 +16,6 @@ RUN apk --update --no-cache add \
         wget \
         curl \
         python2 \
-        musl-dev \
         libssl1.0 \
         openssl-dev \
         pcre \
@@ -26,7 +24,6 @@ RUN apk --update --no-cache add \
         perl-list-moreutils \
         perl-http-message \
         geoip \
-        dumb-init \
         jq \
         jansson \
     && update-ca-certificates
@@ -56,7 +53,7 @@ COPY etc-api-gateway /etc/api-gateway
 
 RUN echo "Beginning OpenRESTy build..." \
     && apk add --update --no-cache --virtual .build-deps \
-            gcc g++ make jemalloc-dev pcre-dev zlib-dev geoip-dev \
+            bash gcc g++ make jemalloc-dev pcre-dev zlib-dev geoip-dev \
     && bash /build-scripts/build-openresty.sh \
     && apk del .build-deps
 
@@ -124,7 +121,7 @@ RUN adduser -S nginx-api-gateway && addgroup -S nginx-api-gateway
 
 EXPOSE 80 8080 8423 9000
 
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+ENTRYPOINT ["/dev/init", "--"]
 CMD ["/etc/init-container.sh"]
 
 # VIM: let b:syntastic_dockerfile_hadolint_args = "--ignore DL3018 --ignore SC2154"
