@@ -6,8 +6,6 @@
 #
 FROM ubuntu:xenial
 
-ARG UNAME_R
-
 # install dependencies
 RUN apt-get update && apt-get -y install --no-install-recommends \
         tar \
@@ -35,6 +33,7 @@ RUN apt-get update && apt-get -y install --no-install-recommends \
         git \
         libjansson-dev \
         kbuild \
+        gnupg \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
@@ -52,6 +51,7 @@ ENV OPENRESTY_VERSION=1.13.6.1 \
     NETURL_LUA_VERSION=0.9-1 \
     CJOSE_VERSION=0.5.1 \
     LD_LIBRARY_PATH=/usr/local/lib \
+    TINI_VERSION=v0.17.0 \
     _prefix=/usr/local \
     _exec_prefix=/usr/local \
     _localstatedir=/var \
@@ -124,11 +124,20 @@ WORKDIR /tmp/stapp
 
 RUN adduser --system --disabled-password --gecos "" nginx-api-gateway
 
+ARG UNAME_R 
+ARG UNAME_M
+
 COPY linux-headers-${UNAME_R} /usr/src/linux-headers-${UNAME_R}
+
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-${UNAME_M} /sbin/tini
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-${UNAME_M}.asc /sbin/tini.asc
+RUN gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
+ && gpg --verify /sbin/tini.asc \
+ && chmod +x /sbin/tini
 
 EXPOSE 80 8080 8423 9000
 
-ENTRYPOINT ["/dev/init", "--"]
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/etc/init-container.sh"]
 
 # VIM: let b:syntastic_dockerfile_hadolint_args = "--ignore DL3008 --ignore SC2154 "

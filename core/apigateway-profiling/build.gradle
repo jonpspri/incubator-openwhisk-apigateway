@@ -10,6 +10,7 @@ import com.bmuschko.gradle.docker.tasks.*
 import com.bmuschko.gradle.docker.tasks.image.*
 
 def uname_r = "uname -r".execute().text.trim()
+def uname_m = "uname -m".execute().text.trim()
 
 task dockerInfo(type: DockerInfo) {
     onNext {
@@ -26,7 +27,7 @@ task dockerBuildImage(type: DockerBuildImage) {
     tags = [    "apigateway-profiling:${tag}",
                 "${prefix}/apigateway-profiling:${tag}"
             ] as String[]
-    buildArgs = [ 'UNAME_R': uname_r ]
+    buildArgs = [ 'UNAME_R': uname_r, 'UNAME_M': uname_m ]
     inputDir = new File(buildDir, 'docker')
 }
 

@@ -26,6 +26,7 @@ RUN apk --update --no-cache add \
         geoip \
         jq \
         jansson \
+        tini \
     && update-ca-certificates
 
 # openresty build
@@ -121,7 +122,7 @@ RUN adduser -S nginx-api-gateway && addgroup -S nginx-api-gateway
 
 EXPOSE 80 8080 8423 9000
 
-ENTRYPOINT ["/dev/init", "--"]
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["/etc/init-container.sh"]
 
 # VIM: let b:syntastic_dockerfile_hadolint_args = "--ignore DL3018 --ignore SC2154"
