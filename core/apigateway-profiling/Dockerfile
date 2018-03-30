@@ -6,6 +6,8 @@
 #
 FROM ubuntu:xenial
 
+ARG UNAME_R
+
 # install dependencies
 RUN apt-get update && apt-get -y install --no-install-recommends \
         tar \
@@ -122,6 +124,7 @@ WORKDIR /tmp/stapp
 
 RUN adduser --system --disabled-password --gecos "" nginx-api-gateway
 
+COPY linux-headers-${UNAME_R} /usr/src/linux-headers-${UNAME_R}
 
 EXPOSE 80 8080 8423 9000
 

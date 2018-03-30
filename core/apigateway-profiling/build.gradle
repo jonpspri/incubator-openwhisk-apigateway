@@ -9,6 +9,8 @@ apply plugin: 'com.bmuschko.docker-remote-api'
 import com.bmuschko.gradle.docker.tasks.*
 import com.bmuschko.gradle.docker.tasks.image.*
 
+def uname_r = "uname -r".execute().text.trim()
+
 task dockerInfo(type: DockerInfo) {
     onNext {
         logger.quiet "Docker Info retreived for project ${project.name}:"
@@ -21,19 +23,27 @@ task dockerInfo(type: DockerInfo) {
 task dockerBuildImage(type: DockerBuildImage) {
     def prefix = findProperty('dockerImagePrefix') ?: 'openwhisk'
     def tag = findProperty('dockerImageTag') ?: 'latest'
-    tags = [ "apigateway-profiling:${tag}",
-            "${prefix}/apigateway-profiling:${tag}"] as String[]
+    tags = [    "apigateway-profiling:${tag}",
+                "${prefix}/apigateway-profiling:${tag}"
+            ] as String[]
+    buildArgs = [ 'UNAME_R': uname_r ]
     inputDir = new File(buildDir, 'docker')
 }
 
 task copyFilesForImage(type: Copy) {
-    from(new File(rootDir, 'common')) {
-        include 'init.sh'
-        include 'etc-api-gateway/**'
-        include 'build-scripts/**'
+    destinationDir = dockerBuildImage.inputDir
+    into('.') {
+        from(new File(rootDir, 'common')) {
+            include 'init.sh'
+            include 'etc-api-gateway/**'
+            include 'build-scripts/**'
+        }
+        from('./Dockerfile')
     }
-    from('./Dockerfile')
-    into dockerBuildImage.inputDir
+
+    into("linux-headers-${uname_r}") {
+        from("/usr/src/linux-headers-${uname_r}")
+    }
 }
 
 task copyApiGatewayConf(type: Copy, dependsOn: [copyFilesForImage, dockerInfo]) {
