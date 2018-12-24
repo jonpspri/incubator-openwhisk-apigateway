@@ -27,6 +27,9 @@ FROM alpine:3.9 as base
 # Busybox's ash shell supports pipefail, which is useful for tarballs
 SHELL [ "/bin/ash", "-o", "pipefail", "-c"]
 
+# Busybox's ash shell supports pipefail, which is useful for tarballs
+SHELL [ "/bin/ash", "-o", "pipefail", "-c"]
+
 # install dependencies
 RUN apk update && \
     apk add \
