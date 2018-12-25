@@ -18,3 +18,7 @@ secrets.yml
 
 # npm
 npm-debug.log
+
+# Profiling artifacts
+api-gateway.conf.profiling*
+Dockerfile.profiling
