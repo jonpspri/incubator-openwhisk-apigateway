@@ -17,19 +17,18 @@
 
 # apigateway
 #
-# VERSION               1.13.6.1
+# VERSION               1.13.6.2
 #
 # From https://hub.docker.com/_/alpine/
 #
-FROM alpine:latest
+FROM alpine:3.8
 
 # install dependencies
-RUN apk --update add \
-    gcc tar libtool zlib jemalloc jemalloc-dev perl tzdata \
-    ca-certificates wget make musl-dev openssl-dev openssl pcre-dev g++ zlib-dev curl python \
+RUN apk add --no-cache \
+    tar libtool zlib jemalloc jemalloc-dev perl tzdata \
+    ca-certificates musl-dev openssl-dev openssl pcre-dev zlib-dev curl python \
     perl-test-longstring perl-list-moreutils perl-http-message geoip-dev dumb-init jq \
-    && update-ca-certificates \
-    && rm -rf /var/cache/apk/*
+    && update-ca-certificates
 
 # openresty build
 ENV OPENRESTY_VERSION=1.13.6.2 \
@@ -50,20 +49,22 @@ ENV OPENRESTY_VERSION=1.13.6.2 \
     _sysconfdir=/etc \
     _sbindir=/usr/local/sbin
 
-RUN  if [ x`uname -m` = xs390x ]; then \
+RUN  if [ "$(uname -m)" = s390x ]; then \
          echo "Building LuaJIT for s390x" \
-	 && mkdir -p /tmp/luajit \
-	 && cd /tmp/luajit \
-	 && curl -k -L https://api.github.com/repos/linux-on-ibm-z/LuaJIT/tarball/v2.1 > luajit.tar.gz \
-	 && tar -zxf luajit.tar.gz \
-	 && cd linux-on-ibm-z-LuaJIT-* \
-	 && make install \
-	 && cd /tmp \
-	 && rm -rf /tmp/luajit \
+         && apk add --no-cache --virtual .build-tools g++ gcc make \
+         && mkdir -p /tmp/luajit \
+      	 && cd /tmp/luajit \
+      	 && curl -k -L https://api.github.com/repos/linux-on-ibm-z/LuaJIT/tarball/v2.1 > luajit.tar.gz \
+      	 && tar -zxf luajit.tar.gz \
+      	 && cd linux-on-ibm-z-LuaJIT-* \
+      	 && make && make install \
+      	 && rm -rf /tmp/luajit \
+         && apk del .build-tools \
      ; fi
 
-RUN  if [ x`uname -m` = xppc64le ]; then \
+RUN  if [ "$(uname -m)" = ppc64le ]; then \
          echo "Building LuaJIT for ppc64le" \
+         && apk add --no-cache --virtual .build-tools g++ gcc make \
          && mkdir /tmp/luajit  \
          && cd /tmp/luajit \
          && curl -k -L https://api.github.com/repos/PPC64/LuaJIT/tarball > luajit.tar.gz \
@@ -71,35 +72,37 @@ RUN  if [ x`uname -m` = xppc64le ]; then \
          && cd PPC64-LuaJIT-* \
          && make && make install \
          && rm -rf /tmp/luajit \
+         && apk del .build-tools \
      ; fi
 
 RUN  echo " ... adding Openresty, NGINX and PCRE" \
+     && apk add --no-cache --virtual .build-tools g++ gcc make \
      && mkdir -p /tmp/api-gateway \
-     && readonly NPROC=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
-     && echo "using up to $NPROC threads" \
-
+     && readonly nproc=$(grep -c ^processor /proc/cpuinfo 2>/dev/null || 1) \
+     && echo "using up to $nproc threads" \
      && cd /tmp/api-gateway/ \
-     && curl -k -L https://ftp.pcre.org/pub/pcre/pcre-${PCRE_VERSION}.tar.gz -o /tmp/api-gateway/pcre-${PCRE_VERSION}.tar.gz \
-     && curl -k -L https://openresty.org/download/openresty-${OPENRESTY_VERSION}.tar.gz -o /tmp/api-gateway/openresty-${OPENRESTY_VERSION}.tar.gz \
-     && tar -zxf ./openresty-${OPENRESTY_VERSION}.tar.gz \
-     && tar -zxf ./pcre-${PCRE_VERSION}.tar.gz \
-     && cd /tmp/api-gateway/openresty-${OPENRESTY_VERSION} \
-
-     && if [ x`uname -m` = xs390x ]; then \
+     && curl -k -L "https://ftp.pcre.org/pub/pcre/pcre-${PCRE_VERSION}.tar.gz" -o /tmp/api-gateway/pcre-${PCRE_VERSION}.tar.gz \
+     && curl -k -L "https://openresty.org/download/openresty-${OPENRESTY_VERSION}.tar.gz" -o /tmp/api-gateway/openresty-${OPENRESTY_VERSION}.tar.gz \
+     && tar -zxf "./openresty-${OPENRESTY_VERSION}.tar.gz" \
+     && tar -zxf "./pcre-${PCRE_VERSION}.tar.gz" \
+     && cd "/tmp/api-gateway/openresty-${OPENRESTY_VERSION}" \
+     && if [ "$(uname -m)" = s390x ]; then \
           luajitdir="=/usr/local/" \
-	  pcrejit="" \
-        ; elif [ x`uname -m` = xppc64le ]; then \
+	        pcrejit="" \
+        ; elif [ "$(uname -m)" = ppc64le ]; then \
           luajitdir="=/usr/local/" \
           pcrejit="--with-pcre-jit" \
         ; else \
-	  luajitdir="" \
-	  pcrejit="--with-pcre-jit" \
-	; fi \
-
-     && echo "        - building debugging version of the api-gateway ... " \
-     && ./configure \
+	        luajitdir="" \
+	        pcrejit="--with-pcre-jit" \
+	   ; fi \
+     && for with_debug in '--with-debug' ''; do \
+        echo "        - building '${with_debug}' version of the api-gateway ... " \
+        && sbin_suffix='' \
+        && if [ -n "$with_debug" ]; then sbin_suffix='-debug'; fi \
+        && ./configure \
             --prefix=${_exec_prefix}/api-gateway \
-            --sbin-path=${_sbindir}/api-gateway-debug \
+            --sbin-path=${_sbindir}/api-gateway${sbin_suffix} \
             --conf-path=${_sysconfdir}/api-gateway/api-gateway.conf \
             --error-log-path=${_localstatedir}/log/api-gateway/error.log \
             --http-log-path=${_localstatedir}/log/api-gateway/access.log \
@@ -128,58 +131,20 @@ RUN  echo " ... adding Openresty, NGINX and PCRE" \
             --without-http_userid_module \
             --without-http_uwsgi_module \
             --without-http_scgi_module \
-            --with-debug \
-            -j${NPROC} \
-    && make -j${NPROC} \
-    && make install \
-
-    && echo "        - building regular version of the api-gateway ... " \
-    && ./configure \
-            --prefix=${_exec_prefix}/api-gateway \
-            --sbin-path=${_sbindir}/api-gateway \
-            --conf-path=${_sysconfdir}/api-gateway/api-gateway.conf \
-            --error-log-path=${_localstatedir}/log/api-gateway/error.log \
-            --http-log-path=${_localstatedir}/log/api-gateway/access.log \
-            --pid-path=${_localstatedir}/run/api-gateway.pid \
-            --lock-path=${_localstatedir}/run/api-gateway.lock \
-            --with-pcre=../pcre-${PCRE_VERSION}/ ${pcrejit} \
-            --with-stream \
-            --with-stream_ssl_module \
-            --with-http_ssl_module \
-            --with-http_stub_status_module \
-            --with-http_realip_module \
-            --with-http_addition_module \
-            --with-http_sub_module \
-            --with-http_dav_module \
-            --with-http_geoip_module \
-            --with-http_gunzip_module  \
-            --with-http_gzip_static_module \
-            --with-http_auth_request_module \
-            --with-http_random_index_module \
-            --with-http_secure_link_module \
-            --with-http_degradation_module \
-            --with-http_auth_request_module  \
-            --with-http_v2_module \
-            --with-luajit${luajitdir} \
-            --without-http_ssi_module \
-            --without-http_userid_module \
-            --without-http_uwsgi_module \
-            --without-http_scgi_module \
-            -j${NPROC} \
-    && make -j${NPROC} \
-    && make install \
-
+            ${with_debug} \
+            -j${nproc} \
+        && make -j${nproc} \
+        && make install \
+    ; done \
     && echo "        - adding Nginx Test support" \
-    && curl -k -L https://github.com/openresty/test-nginx/archive/v${TEST_NGINX_VERSION}.tar.gz -o ${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz \
-    && cd ${_prefix} \
-    && tar -xf ${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz \
-    && rm ${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz \
-    && cp -r ${_prefix}/test-nginx-0.24/inc/* /usr/local/share/perl5/site_perl/ \
-
-    && ln -s ${_sbindir}/api-gateway-debug ${_sbindir}/nginx \
-    && cp /tmp/api-gateway/openresty-${OPENRESTY_VERSION}/build/install ${_prefix}/api-gateway/bin/resty-install \
-    && apk del g++ gcc make \
-    && rm -rf /var/cache/apk/* \
+    && curl -k -L "https://github.com/openresty/test-nginx/archive/v${TEST_NGINX_VERSION}.tar.gz" -o "${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz" \
+    && cd "${_prefix}" \
+    && tar -xf "${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz" \
+    && rm "${_prefix}/test-nginx-${TEST_NGINX_VERSION}.tar.gz" \
+    && cp -r "${_prefix}/test-nginx-0.24/inc/"* /usr/local/share/perl5/site_perl/ \
+    && ln -s "${_sbindir}/api-gateway-debug ${_sbindir}/nginx" . \
+    && cp "/tmp/api-gateway/openresty-${OPENRESTY_VERSION}/build/install" "${_prefix}/api-gateway/bin/resty-install" \
+    && apk del .build-tools \
     && rm -rf /tmp/api-gateway
 
 RUN echo " ... installing opm..." \
@@ -215,13 +180,14 @@ RUN echo " ... installing neturl.lua ... " \
     && rm -rf /tmp/api-gateway
 
 RUN echo " ... installing cjose ... " \
-    && apk update && apk add automake autoconf git gcc make jansson jansson-dev \
+    && apk add --no-cache --virtual .build-tools automake autoconf git gcc make jansson jansson-dev \
     && mkdir -p /tmp/api-gateway \
     && curl -L -k https://github.com/cisco/cjose/archive/${CJOSE_VERSION}.tar.gz -o /tmp/api-gateway/cjose-${CJOSE_VERSION}.tar.gz \
     && tar -xf /tmp/api-gateway/cjose-${CJOSE_VERSION}.tar.gz -C /tmp/api-gateway/ \
     && cd /tmp/api-gateway/cjose-${CJOSE_VERSION} \
     && sh configure \
     && make && make install \
+    && apk del .build-tools \
     && rm -rf /tmp/api-gateway
 
 ENV CONFIG_SUPERVISOR_VERSION 1.0.1-RC1
